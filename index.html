@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kukreja Order Desk</title>
+<style>
+  :root { --ink:#1c1915; --muted:#6d6458; --line:#e4dccf; --paper:#f7f3ec; --card:#fffdf9; --accent:#8a3d24; --green:#2f4a3c; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:"Segoe UI", Candara, sans-serif; color:var(--ink); background:var(--paper); }
+  header { background:#241c16; color:#f6efe6; padding:14px 16px; display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; }
+  header h1 { margin:0; font-size:18px; }
+  header p { margin:2px 0 0; color:#d8cbbd; font-size:12px; }
+  button, input, select { font:inherit; }
+  button { border:1px solid #c9bba8; background:#fff; border-radius:8px; padding:8px 12px; cursor:pointer; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  button.ghost { background:transparent; color:#f6efe6; border-color:#6d5c4d; }
+  main { max-width:1180px; margin:0 auto; padding:14px; }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+  .tabs button[aria-pressed="true"] { background:var(--green); color:#fff; border-color:var(--green); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px; }
+  .grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; }
+  label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+  input, select { width:100%; border:1px solid #d9cfc2; border-radius:8px; padding:8px; background:#fff; }
+  .table-wrap { overflow-x:auto; } table { width:100%; border-collapse:collapse; font-size:13px; min-width:720px; }
+  th { text-align:left; font-size:11px; color:var(--muted); padding:6px 4px; }
+  td { padding:4px; vertical-align:top; }
+  td input, td select { padding:6px; }
+  .note { color:var(--muted); font-size:12px; }
+  .ok { color:var(--green); font-weight:650; }
+  .warn { color:#a15c12; font-weight:650; }
+  .totals { display:flex; gap:16px; justify-content:flex-end; font-variant-numeric:tabular-nums; }
+  #printSheet { display:none; }
+  @media (max-width:860px) { .grid { grid-template-columns:1fr 1fr; } header { position:sticky; top:0; z-index:2; } }
+  @media print {
+    header, main, .no-print { display:none !important; }
+    #printSheet { display:block; font-family:"Times New Roman", serif; padding:8mm; }
+    #printSheet h1 { text-align:center; font-size:18px; margin:0 0 8px; }
+    #printSheet table { width:100%; border-collapse:collapse; font-size:12px; }
+    #printSheet th, #printSheet td { border:1px solid #222; padding:4px 6px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Kukreja Order Desk</h1><p id="statusLine">Enquiry to closed order</p></div>
+  <div>
+    <button class="ghost" id="newBtn" type="button">New enquiry</button>
+    <button class="primary" id="saveBtn" type="button">Save</button>
+  </div>
+</header>
+<main>
+  <div class="card" style="display:flex; gap:8px; align-items:end;">
+    <div style="flex:1"><label>Open enquiry</label><select id="enquiryPick"></select></div>
+    <button type="button" id="sampleBtn">Load sample 33482</button>
+  </div>
+  <div class="tabs" id="tabs"></div>
+  <section id="panel"><div class="card">Loading enquiry...</div></section>
+</main>
+<section id="printSheet"></section>
+<script>
+const KEY = "kukreja-order-desk-v1";
+const SAMPLE = [{"room": "LIVING ROOM GROUND", "folder": "108880", "collection": "LUSTRE-101", "product": "CURTAIN", "style": "AP", "width": 105, "height": 113.5, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 2, "lining": "REGULAR LINING", "hardware": "NDL", "coverage": ""}, {"room": "LIVING ROOM GROUND", "folder": "108880", "collection": "LUSTRE-101", "product": "CURTAIN", "style": "AP", "width": 99, "height": 113.5, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 2, "lining": "REGULAR LINING", "hardware": "NDL", "coverage": ""}, {"room": "LIVING ROOM GROUND", "folder": "108880", "collection": "LUSTRE-101", "product": "CURTAIN", "style": "AP", "width": 24, "height": 113.5, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 1, "lining": "REGULAR LINING", "hardware": "NDL", "coverage": 48}, {"room": "LIVING ROOM GROUND", "folder": "108880", "collection": "LUSTRE-101", "product": "CURTAIN", "style": "ROMAN", "width": 11, "height": 99.5, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 1, "lining": "DIMOUT LINING", "hardware": "ROMAN", "coverage": ""}, {"room": "LIVING ROOM GROUND", "folder": "108880", "collection": "LUSTRE-101", "product": "CURTAIN", "style": "ROMAN", "width": 21, "height": 61, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 1, "lining": "DIMOUT LINING", "hardware": "ROMAN", "coverage": ""}, {"room": "LIVING ROOM GROUND", "folder": "108880", "collection": "LUSTRE-101", "product": "CURTAIN", "style": "ROMAN", "width": 21.25, "height": 61, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 1, "lining": "DIMOUT LINING", "hardware": "ROMAN", "coverage": ""}, {"room": "LIVING ROOM GROUND", "folder": "108880", "collection": "LUSTRE-101", "product": "CURTAIN", "style": "ROMAN", "width": 21.75, "height": 45, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 1, "lining": "DIMOUT LINING", "hardware": "ROMAN", "coverage": ""}, {"room": "ROOM 1", "folder": "108880", "collection": "LUSTRE-131", "product": "CURTAIN", "style": "AP", "width": 182, "height": 114.5, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 2, "lining": "REGULAR LINING", "hardware": "NONE", "coverage": ""}, {"room": "ROOM 1", "folder": "108880", "collection": "LUSTRE-131", "product": "CURTAIN", "style": "ROMAN", "width": 29, "height": 53.75, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 1, "lining": "DIMOUT LINING", "hardware": "ROMAN", "coverage": ""}, {"room": "ROOM 1", "folder": "108880", "collection": "LUSTRE-131", "product": "CURTAIN", "style": "ROMAN", "width": 29, "height": 53.75, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 1, "lining": "DIMOUT LINING", "hardware": "ROMAN", "coverage": ""}, {"room": "LIVING ROOM UPPER", "folder": "108880", "collection": "LUSTRE-101", "product": "CURTAIN", "style": "AP", "width": 105, "height": 114, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 2, "lining": "REGULAR LINING", "hardware": "NONE", "coverage": ""}, {"room": "LIVING ROOM UPPER", "folder": "108880", "collection": "LUSTRE-101", "product": "CURTAIN", "style": "AP", "width": 96, "height": 114, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 2, "lining": "REGULAR LINING", "hardware": "NONE", "coverage": ""}, {"room": "LIVING ROOM UPPER", "folder": "108880", "collection": "LUSTRE-101", "product": "CURTAIN", "style": "AP", "width": 24, "height": 114, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 1, "lining": "REGULAR LINING", "hardware": "NONE", "coverage": 48}, {"room": "ROOM 2", "folder": "108880", "collection": "LUSTRE-148", "product": "CURTAIN", "style": "AP", "width": 153, "height": 114, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 2, "lining": "REGULAR LINING", "hardware": "NONE", "coverage": ""}, {"room": "ROOM 2", "folder": "108880", "collection": "LUSTRE-148", "product": "CURTAIN", "style": "ROMAN", "width": 30.5, "height": 47.5, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 1, "lining": "DIMOUT LINING", "hardware": "ROMAN", "coverage": ""}, {"room": "ROOM 2", "folder": "108880", "collection": "LUSTRE-148", "product": "CURTAIN", "style": "ROMAN", "width": 32.5, "height": 47, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 1, "lining": "DIMOUT LINING", "hardware": "ROMAN", "coverage": ""}, {"room": "ROOM 3", "folder": "108880", "collection": "LUSTRE-128", "product": "CURTAIN", "style": "EYELET", "width": 182.5, "height": 113.5, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 2, "lining": "REGULAR LINING", "hardware": "NDL", "coverage": ""}, {"room": "ROOM 3", "folder": "108880", "collection": "LUSTRE-128", "product": "CURTAIN", "style": "EYELET", "width": 47.5, "height": 113.5, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 2, "lining": "REGULAR LINING", "hardware": "NDL", "coverage": 24}, {"room": "ROOM 3", "folder": "108880", "collection": "LUSTRE-128", "product": "CURTAIN", "style": "EYELET", "width": 47.5, "height": 113.5, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 1, "lining": "REGULAR LINING", "hardware": "NDL", "coverage": 24}, {"room": "ROOM 3", "folder": "108880", "collection": "LUSTRE-128", "product": "CURTAIN", "style": "ROMAN", "width": 28.25, "height": 54.25, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 1, "lining": "DIMOUT LINING", "hardware": "ROMAN", "coverage": ""}, {"room": "ROOM 3", "folder": "108880", "collection": "LUSTRE-128", "product": "CURTAIN", "style": "ROMAN", "width": 28.25, "height": 54.25, "fabricWidth": 54, "liningWidth": 54, "hem": 12, "repeat": 0, "extra": 0, "splits": 1, "lining": "DIMOUT LINING", "hardware": "ROMAN", "coverage": ""}];
+const RATES = {
+  "LUSTRE-101":695,"LUSTRE-131":695,"LUSTRE-148":695,"LUSTRE-128":695,
+  "REGULAR LINING":110,"DIMOUT LINING":345,"AP STITCHING":225,"ROMAN STITCHING":110,
+  "LINING STITCHING":100,"ROMAN TRACK ASSEMBLED":450,"FREIGHT":1500
+};
+const GST = { "LUSTRE-101":"INC","LUSTRE-131":"INC","LUSTRE-148":"INC","LUSTRE-128":"INC" };
+let db = load();
+let id = db.enquiries[0]?.id || null;
+let tab = "customer";
+
+function load() {
+  try { const s = JSON.parse(localStorage.getItem(KEY) || "null"); if (s && s.enquiries) return s; } catch (err) {}
+  return { nextQuote: 33483, nextCut: 156401, enquiries: [] };
+}
+function persist() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (err) {} }
+function money(n) { return Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 }); }
+function esc(s) { return String(s ?? "").replace(/&/g,"\u0026amp;").replace(/"/g,"\u0026quot;").replace(/</g,"\u0026lt;"); }
+function rup(n) { return Math.ceil(n - 1e-9); }
+function rnd(n, d=2) { return Math.round((n + 1e-10) * 10**d) / 10**d; }
+function current() { return db.enquiries.find(e => e.id === id); }
+function blankEnquiry() {
+  return { id: "enq-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8), quoteNo: db.nextQuote++, revision: 1, status: "ENQUIRY",
+    customer:"", billTo:"", phone:"", site:"", tailor:"", visit:"", issued:new Date().toISOString().slice(0,10), valid:"",
+    token:0, approval:0, openings:[], stock:{}, received:{}, taken:{}, closed:false };
+}
+
+function calcOpening(o) {
+  const w = Number(o.width)||0, h = Number(o.height)||0;
+  const product = o.product || "CURTAIN";
+  if (!w || !h) return { qty:0, unit:"", parts:[] };
+  if (product === "WALLPAPER") {
+    const rolls = rup((w*h/144) / (Number(o.rollSqft)||56));
+    return { qty:rolls, unit:"Rolls", parts:[{name:o.collection||"WALLPAPER", qty:rolls, unit:"Rolls", kind:"MATERIAL"}] };
+  }
+  if (["BLIND","FLOOR","POSTER"].includes(product)) {
+    const area = rnd(w*h/144);
+    return { qty:area, unit:"Sqft", parts:[{name:o.collection||product, qty:area, unit:"Sqft", kind:"MATERIAL"}] };
+  }
+  const style = o.style || "AP";
+  const fw = Number(o.fabricWidth)||54, lw = Number(o.liningWidth)||fw;
+  const base = style==="ROMAN" ? 48 : 22;
+  const cov = o.coverage !== "" && o.coverage != null ? Number(o.coverage) : base * fw / 54;
+  const widths = rup(w / cov);
+  const hem = Number(o.hem)||0, rep = Number(o.repeat)||0, extra = Number(o.extra)||0;
+  const cut = rep ? rup((h+hem)/rep)*rep : h+hem;
+  const fabric = rnd(cut * widths * 0.0254 * (1+extra/100));
+  const parts = [{ name:o.collection||"FABRIC", qty:fabric, unit:"Mtrs", kind:"MATERIAL" }];
+  if (o.lining) {
+    const liningWidths = rup(w / (cov * lw / fw));
+    parts.push({ name:o.lining, qty:rnd((h+hem)*liningWidths*0.0254*(1+extra/100)), unit:"Mtrs", kind:"MATERIAL" });
+    if (style !== "ROMAN") parts.push({ name:"LINING STITCHING", qty:liningWidths, unit:"Panels", kind:"LABOUR" });
+  }
+  if (style === "ROMAN") parts.push({ name:"ROMAN STITCHING", qty:rnd(Math.max(w*h/144, 11)), unit:"Sqft", kind:"LABOUR" });
+  else parts.push({ name: style==="EYELET" ? "EYELET STITCHING" : "AP STITCHING", qty:widths, unit:"Panels", kind:"LABOUR" });
+  if (o.hardware && o.hardware !== "NONE") {
+    const track = rup(Math.max(w/12, 3));
+    parts.push({ name:o.hardware==="ROMAN" ? "ROMAN TRACK ASSEMBLED" : (o.hardware==="MOTORISED" ? "MOTORISED TRACK" : "NDL 20 CURTAIN TRACK"), qty:track, unit:"Rft", kind:"HARDWARE" });
+    parts.push({ name:"INSTALLATION", qty:1, unit:"Jobs", kind:"LABOUR" });
+    if (o.hardware==="NDL") parts.push({ name:"NDL ACCESSORIES", qty:widths, unit:"Set", kind:"INCLUDED" });
+    if (style==="EYELET") parts.push({ name:"EYELET RINGS", qty:widths*10, unit:"Nos", kind:"INCLUDED" });
+    if (style!=="ROMAN") parts.push({ name: style==="EYELET" ? "EYELET TAPE" : "AP TAPE", qty:rnd(widths*1.4), unit:"Mtrs", kind:"INCLUDED" });
+    if (o.hardware==="ROMAN") parts.push({ name:"ROMAN CONTROL SET", qty:Number(o.splits)||1, unit:"Sets", kind:"INCLUDED" });
+  }
+  return { qty:fabric, unit:"Mtrs", parts };
+}
+function materials(e) {
+  const map = new Map();
+  e.openings.forEach(o => calcOpening(o).parts.forEach(p => {
+    if (p.kind === "INCLUDED") return;
+    const key = p.kind + "|" + p.name;
+    if (!map.has(key)) map.set(key, { ...p, qty:0 });
+    map.get(key).qty = rnd(map.get(key).qty + p.qty);
+  }));
+  return [...map.values()].map(m => {
+    const override = e.stock?.[m.name+"|override"];
+    const finalQty = override !== "" && override != null && !Number.isNaN(Number(override)) && override !== undefined && String(override) !== "" ? Number(override) : m.qty;
+    return { ...m, calculated:m.qty, finalQty, rate:RATES[m.name] ?? "", gst:GST[m.name] || "EXTRA", cutlength:e.stock?.[m.name+"|cut"] || "" };
+  });
+}
+function lineAmount(m, discount) {
+  if (m.rate === "" || m.rate == null) return null;
+  const gross = m.finalQty * Number(m.rate);
+  return rnd(gross * (1 - (Number(discount)||0)/100));
+}
+function quoteTotals(e) {
+  const lines = materials(e);
+  let taxable = 0, gst = 0, payable = 0, missing = 0;
+  lines.forEach(m => {
+    const amt = lineAmount(m, 0);
+    if (amt == null) { missing++; return; }
+    const rate = Number(m.rate), g = 0;
+    if (m.gst === "INC") { taxable += amt; payable += amt; }
+    else { taxable += amt; gst += rnd(amt*g); payable += amt; }
+  });
+  return { taxable, gst, payable, missing, lines };
+}
+
+function render() {
+  const tabs = [["customer","Customer"],["measure","Measure"],["materials","Qty"],["quote","Quote"],["order","Order"],["godown","Godown"],["bill","Bill"]];
+  document.getElementById("tabs").innerHTML = tabs.map(([k,l]) => `<button type="button" data-tab="${k}" aria-pressed="${tab===k}">${l}</button>`).join("");
+  document.getElementById("enquiryPick").innerHTML = db.enquiries.map(e => `<option value="${e.id}" ${e.id===id?"selected":""}>${e.quoteNo} · ${esc(e.customer||"New")}</option>`).join("") || "<option>No enquiry</option>";
+  const e = current();
+  document.getElementById("statusLine").textContent = e ? `${e.quoteNo} / REV ${e.revision} · ${e.status}` : "No enquiry open";
+  document.getElementById("panel").innerHTML = e ? panels[tab](e) : "<div class='card'>Create an enquiry or load sample 33482.</div>";
+}
+const panels = {
+  customer(e) {
+    return `<div class="card"><div class="grid">
+      ${field("Customer", "customer", e.customer)} ${field("Bill to", "billTo", e.billTo)} ${field("Phone", "phone", e.phone)} ${field("Site", "site", e.site)}
+      ${field("Tailor", "tailor", e.tailor)} ${field("Visit", "visit", e.visit, "date")} ${field("Issued", "issued", e.issued, "date")} ${field("Valid", "valid", e.valid, "date")}
+      ${field("Token advance", "token", e.token, "number")} ${field("Approval advance %", "approval", e.approval, "number")}
+    </div><p class="note">Token can be taken at enquiry. Approval advance is asked after the quote is passed.</p></div>`;
+  },
+  measure(e) {
+    const rows = e.openings.map((o,i) => `<tr>
+      <td><input data-i="${i}" data-k="room" value="${esc(o.room)}"></td>
+      <td><input data-i="${i}" data-k="folder" value="${esc(o.folder)}"></td>
+      <td><input data-i="${i}" data-k="collection" value="${esc(o.collection)}"></td>
+      <td><select data-i="${i}" data-k="product">${opt(["CURTAIN","UPHOLSTERY","BLIND","WALLPAPER","FLOOR","POSTER"], o.product||"CURTAIN")}</select></td>
+      <td><select data-i="${i}" data-k="style">${opt(["AP","EYELET","ROMAN"], o.style||"AP")}</select></td>
+      <td><input data-i="${i}" data-k="width" value="${esc(o.width)}"></td>
+      <td><input data-i="${i}" data-k="height" value="${esc(o.height)}"></td>
+      <td><select data-i="${i}" data-k="lining">${opt(["","REGULAR LINING","DIMOUT LINING"], o.lining||"")}</select></td>
+      <td><select data-i="${i}" data-k="hardware">${opt(["NONE","NDL","MOTORISED","ROMAN"], o.hardware||"NONE")}</select></td>
+      <td><button type="button" data-del="${i}">x</button></td></tr>`).join("");
+    return `<div class="card"><div class="table-wrap"><table><thead><tr><th>Room</th><th>Folder</th><th>Collection</th><th>Product</th><th>Style</th><th>Width in</th><th>Height in</th><th>Lining</th><th>Hardware</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+      </div><button type="button" id="addOpening">Add opening</button></div><p class="note">Only width and height are punched. Splits do not multiply fabric. Coverage follows the workbook: 22 in American pleat and eyelet, 48 in Roman, scaled to fabric width.</p></div>`;
+  },
+  materials(e) {
+    const lines = materials(e);
+    const rows = lines.map(m => `<tr><td>${esc(m.kind)}</td><td>${esc(m.name)}</td><td>${m.calculated}</td><td><input data-over="${esc(m.name)}" value="${esc(e.stock?.[m.name+"|override"] ?? "")}"></td><td>${m.finalQty} ${esc(m.unit)}</td><td>${m.rate===""?"Rate missing":m.rate}</td></tr>`).join("");
+    const fab = lines.filter(m => m.unit==="Mtrs" && !m.name.includes("LINING") && !m.name.includes("TAPE")).reduce((s,m)=>s+m.calculated,0);
+    return `<div class="card"><p class="${quoteTotals(e).missing?"warn":"ok"}">${lines.length} charged lines. Fabric metres ${rnd(fab)}. Missing rates stay blank and are not invented.</p>
+      <div class="table-wrap"><table><thead><tr><th>Type</th><th>Item</th><th>Calculated</th><th>Override</th><th>Final</th><th>Rate</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  },
+  quote(e) {
+    const t = quoteTotals(e);
+    const rows = t.lines.map(m => `<tr><td>${esc(m.kind)}</td><td>${esc(m.name)}</td><td>${m.finalQty}</td><td>${esc(m.unit)}</td><td>${m.rate===""?"—":m.rate}</td><td>${lineAmount(m,0)==null?"PENDING":money(lineAmount(m,0))}</td></tr>`).join("");
+    return `<div class="card"><div class="totals"><span>Taxable <b>${t.missing?"PENDING":money(t.taxable)}</b></span><span>Payable <b>${t.missing?"PENDING":money(t.payable)}</b></span></div>
+      <div class="table-wrap"><table><thead><tr><th>Type</th><th>Particulars</th><th>Qty</th><th>Unit</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table>
+      </div><button type="button" id="printQuote">Print quotation</button> <button type="button" id="passQuote">Mark quote passed</button>
+      <p class="note">Print can be read by type. Room grouping is on the measurement sheet. Amounts stay pending while a rate is missing.</p></div>`;
+  },
+  order(e) {
+    return `<div class="card"><p>Status: <b>${e.status}</b></p><button type="button" id="toOrder">Convert to sales order and assign cutlengths</button>
+      <p class="note">Zero stock lines receive the next cutting serial. In-stock lines are reserved and do not get a cutlength.</p>
+      <ul>${materials(e).map(m => `<li>${esc(m.name)} · final ${m.finalQty} · cutlength ${esc(m.cutlength||"—")}</li>`).join("")}</ul></div>`;
+  },
+  godown(e) {
+    const rows = materials(e).filter(m => m.kind!=="LABOUR").map(m => `<tr><td>${esc(m.cutlength||"STOCK")}</td><td>${esc(m.name)}</td><td>${m.finalQty}</td><td><input data-rec="${esc(m.name)}" value="${esc(e.received?.[m.name]||"")}"></td><td><input data-taken="${esc(m.name)}" value="${esc(e.taken?.[m.name]||"")}"></td></tr>`).join("");
+    return `<div class="card"><table><thead><tr><th>Cutlength</th><th>Item</th><th>Qty</th><th>Received</th><th>Taken</th></tr></thead><tbody>${rows}</tbody></table>
+      <button type="button" id="printSlip">Print cutting slip</button><p class="note">Match the supplier invoice to the cutlength, then mark received. The slip has no amounts.</p></div>`;
+  },
+  bill(e) {
+    const t = quoteTotals(e);
+    const advance = Number(e.token)||0;
+    const balance = t.missing ? "PENDING" : money(Math.max(0, t.payable - advance));
+    return `<div class="card"><p>Token received ${money(advance)}. Balance ${balance}.</p>
+      <button type="button" id="raiseBill">Raise final bill</button> <button type="button" id="markPaid">Final payment received</button> <button type="button" id="closeOrder">Installation done, close order</button>
+      <p class="note">Invoice is generated after final payment. A closed order stays as history.</p></div>`;
+  }
+};
+function field(label, key, value, type="text") { return `<div><label>${label}</label><input data-field="${key}" type="${type}" value="${esc(value)}"></div>`; }
+function opt(list, value) { return list.map(v => `<option ${v===value?"selected":""}>${esc(v)}</option>`).join(""); }
+
+function printQuote() {
+  const e = current(); const t = quoteTotals(e);
+  document.getElementById("printSheet").innerHTML = `<h1>QUOTATION ${e.quoteNo} / REV ${e.revision}</h1>
+    <p>Customer: ${esc(e.customer)} · Bill to: ${esc(e.billTo)} · Phone: ${esc(e.phone)}</p>
+    <div class="table-wrap"><table><thead><tr><th>Type</th><th>Particulars</th><th>Qty</th><th>Unit</th><th>Rate</th><th>Amount</th></tr></thead>
+    <tbody>${t.lines.map(m => `<tr><td>${esc(m.kind)}</td><td>${esc(m.name)}</td><td>${m.finalQty}</td><td>${esc(m.unit)}</td><td>${m.rate===""?"":m.rate}</td><td>${lineAmount(m,0)==null?"PENDING":money(lineAmount(m,0))}</td></tr>`).join("")}</tbody></table>
+    <p style="text-align:right">Payable ${t.missing?"PENDING":money(t.payable)}</p>`;
+  window.print();
+}
+function printSlip() {
+  const e = current();
+  const lines = materials(e).filter(m => m.kind!=="LABOUR");
+  document.getElementById("printSheet").innerHTML = `<h1>CUTTING SLIP</h1><p>Order ${e.quoteNo} · Tailor ${esc(e.tailor)} · ${esc(e.customer)}</p>
+    <table><thead><tr><th>Cutlength</th><th>Item</th><th>Qty</th><th>Received</th><th>Taken</th></tr></thead>
+    <tbody>${lines.map(m => `<tr><td>${esc(m.cutlength||"")}</td><td>${esc(m.name)}</td><td>${m.finalQty}</td><td>${esc(e.received?.[m.name]||"")}</td><td>${esc(e.taken?.[m.name]||"")}</td></tr>`).join("")}</tbody></table>`;
+  window.print();
+}
+function onPanel(ev) {
+  const e = current(); if (!e) return;
+  const t = ev.target;
+  if (t.dataset.field) { e[t.dataset.field] = t.type==="number" ? Number(t.value||0) : t.value; persist(); document.getElementById("statusLine").textContent = `${e.quoteNo} / REV ${e.revision} · ${e.status}`; return; }
+  if (t.dataset.k) { e.openings[t.dataset.i][t.dataset.k] = t.value; persist(); }
+  if (t.dataset.over != null && ev.type==="change") { e.stock[t.dataset.over+"|override"] = t.value; persist(); render(); }
+  if (t.dataset.rec != null) { e.received[t.dataset.rec] = t.value; e.status = "INWARD"; persist(); }
+  if (t.dataset.taken != null) { e.taken[t.dataset.taken] = t.value; persist(); }
+}
+document.getElementById("panel").addEventListener("input", onPanel);
+document.getElementById("panel").addEventListener("change", onPanel);
+document.getElementById("panel").addEventListener("click", ev => {
+  const e = current(); const t = ev.target;
+  if (t.id==="addOpening") { e.openings.push({room:"",folder:"",collection:"",product:"CURTAIN",style:"AP",width:"",height:"",fabricWidth:54,liningWidth:54,hem:12,repeat:0,extra:0,splits:1,lining:"",hardware:"NDL",coverage:""}); persist(); render(); }
+  if (t.dataset.del) { e.openings.splice(Number(t.dataset.del),1); persist(); render(); }
+  if (t.id==="printQuote") printQuote();
+  if (t.id==="printSlip") printSlip();
+  if (t.id==="passQuote") { e.status="QUOTE PASSED"; persist(); render(); }
+  if (t.id==="toOrder") {
+    materials(e).forEach(m => { if (m.kind!=="LABOUR" && !e.stock[m.name+"|cut"]) e.stock[m.name+"|cut"] = db.nextCut++; });
+    e.status = "SALES ORDER"; persist(); render();
+  }
+  if (t.id==="raiseBill") { e.status="BILLED"; persist(); render(); }
+  if (t.id==="markPaid") { e.status="PAID"; persist(); render(); }
+  if (t.id==="closeOrder") { e.status="CLOSED"; e.closed=true; persist(); render(); }
+});
+document.getElementById("tabs").onclick = ev => { if (ev.target.dataset.tab) { tab = ev.target.dataset.tab; render(); } };
+document.getElementById("newBtn").onclick = () => { const e = blankEnquiry(); e.stock={}; e.received={}; e.taken={}; db.enquiries.unshift(e); id=e.id; tab="customer"; persist(); render(); };
+document.getElementById("saveBtn").onclick = () => { persist(); alert("Saved on this device"); };
+document.getElementById("sampleBtn").onclick = () => {
+  const e = blankEnquiry();
+  e.quoteNo = 33482; e.customer = "AMOL CHAUDHARI"; e.billTo = "SNEH RESORT"; e.phone = "838001623"; e.issued = "2026-10-08"; e.valid = "2026-10-15";
+  e.openings = SAMPLE; e.stock={}; e.received={}; e.taken={}; e.status = "MEASURED";
+  db.enquiries.unshift(e); id=e.id; tab="customer"; persist(); render();
+};
+document.getElementById("enquiryPick").onchange = ev => { id = ev.target.value; render(); };
+try {
+  if (!db.enquiries.length) document.getElementById("sampleBtn").onclick();
+  else render();
+} catch (err) {
+  document.getElementById("panel").innerHTML = "<div class='card'><b>The page hit an error.</b><pre>" + String(err && err.stack || err) + "</pre></div>";
+}
+</script>
+</body>
+</html>
