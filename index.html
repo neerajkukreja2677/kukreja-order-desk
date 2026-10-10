@@ -47,7 +47,8 @@
 <header>
   <div><h1>Kukreja Order Desk</h1><p id="statusLine">Enquiry to closed order</p></div>
   <div>
-    <button class="ghost" id="newBtn" type="button">New enquiry</button>
+    <button class="primary" id="newBtn" type="button">Add New Enquiry</button>
+    <button class="ghost" id="editBtn" type="button">Edit</button>
     <button class="primary" id="saveBtn" type="button">Save</button>
   </div>
 </header>
@@ -56,7 +57,8 @@
     <div style="flex:1; min-width:180px;"><label>Open enquiry</label><select id="enquiryPick"></select></div>
     <div style="flex:1; min-width:180px;"><label>Search by name</label><input id="nameSearch" placeholder="Customer name"></div>
     <div style="flex:1; min-width:180px;"><label>Search by mobile</label><input id="mobileSearch" inputmode="tel" placeholder="Enter mobile number"></div>
-    <button type="button" class="primary" id="addNewBtn">Add New</button>
+    <button type="button" class="primary" id="addNewBtn">Add New Enquiry</button>
+    <button type="button" id="editMainBtn">Edit</button>
     <button type="button" id="sampleBtn">Load sample 33482</button>
   </div>
   <div id="mobileHits"></div>
@@ -382,6 +384,14 @@ document.getElementById("addNewBtn").onclick = () => {
   e.stock={}; e.received={}; e.taken={};
   db.enquiries.unshift(e); id=e.id; tab="customer"; persist(); render();
 };
+function editOpenEnquiry() {
+  const open = current();
+  if (!open) return alert("Select an enquiry first");
+  tab = "customer";
+  render();
+}
+document.getElementById("editBtn").onclick = editOpenEnquiry;
+document.getElementById("editMainBtn").onclick = editOpenEnquiry;
 document.getElementById("saveBtn").onclick = () => { persist(); alert("Saved on this device"); };
 document.getElementById("sampleBtn").onclick = () => {
   const e = blankEnquiry();
