@@ -54,6 +54,7 @@
 <main>
   <div class="card" style="display:flex; gap:8px; align-items:end; flex-wrap:wrap;">
     <div style="flex:1; min-width:180px;"><label>Open enquiry</label><select id="enquiryPick"></select></div>
+    <div style="flex:1; min-width:180px;"><label>Search by name</label><input id="nameSearch" placeholder="Customer name"></div>
     <div style="flex:1; min-width:180px;"><label>Search by mobile</label><input id="mobileSearch" inputmode="tel" placeholder="Enter mobile number"></div>
     <button type="button" id="sampleBtn">Load sample 33482</button>
   </div>
@@ -76,6 +77,7 @@ let db = load();
 let id = db.enquiries[0]?.id || null;
 let tab = "customer";
 let mobileQuery = "";
+let nameQuery = "";
 function digits(s) { return String(s || "").replace(/\D/g, ""); }
 
 function load() {
@@ -190,7 +192,9 @@ function render() {
   document.getElementById("enquiryPick").innerHTML = db.enquiries.map(e => `<option value="${e.id}" ${e.id===id?"selected":""}>${e.quoteNo} · ${esc(e.customer||"New")} · ${esc(e.phone||"no mobile")}</option>`).join("") || "<option>No enquiry</option>";
   const search = document.getElementById("mobileSearch");
   if (search && document.activeElement !== search) search.value = mobileQuery;
-  searchMobile();
+  const nameBox = document.getElementById("nameSearch");
+  if (nameBox && document.activeElement !== nameBox) nameBox.value = nameQuery;
+  searchCustomers();
   document.getElementById("statusLine").textContent = e ? `${e.quoteNo} / REV ${e.revision} · ${e.status}` : "No enquiry open";
   document.getElementById("panel").innerHTML = e ? panels[tab](e) : "<div class='card'>Create an enquiry or load sample 33482.</div>";
 }
@@ -373,18 +377,24 @@ document.getElementById("sampleBtn").onclick = () => {
   db.enquiries.unshift(e); id=e.id; tab="customer"; persist(); render();
 };
 document.getElementById("enquiryPick").onchange = ev => { id = ev.target.value; render(); };
-function searchMobile() {
+function searchCustomers() {
   const box = document.getElementById("mobileHits");
   if (!box) return;
   const q = mobileQuery.trim();
+  const n = nameQuery.trim().toLowerCase();
   const d = digits(q);
-  if (!d) { box.innerHTML = ""; return; }
-  const found = db.enquiries.filter(e => digits(e.phone).includes(d));
+  if (!d && !n) { box.innerHTML = ""; return; }
+  const found = db.enquiries.filter(e => {
+    const mobileOk = !d || digits(e.phone).includes(d);
+    const nameOk = !n || String(e.customer||"").toLowerCase().includes(n) || String(e.billTo||"").toLowerCase().includes(n);
+    return mobileOk && nameOk;
+  });
   if (!found.length) {
-    box.innerHTML = `<div class="card"><p>No enquiry for ${esc(q)}. <button type="button" id="newFromMobile">Start new enquiry</button></p></div>`;
-    document.getElementById("newFromMobile").onclick = () => {
+    const label = [n && nameQuery.trim(), d && q].filter(Boolean).join(" · ");
+    box.innerHTML = `<div class="card"><p>No enquiry for ${esc(label)}. <button type="button" id="newFromSearch">Start new enquiry</button></p></div>`;
+    document.getElementById("newFromSearch").onclick = () => {
       const e = blankEnquiry();
-      e.phone = q; e.stock={}; e.received={}; e.taken={};
+      e.customer = nameQuery.trim(); e.phone = q; e.stock={}; e.received={}; e.taken={};
       db.enquiries.unshift(e); id=e.id; tab="customer"; persist(); render();
     };
     return;
@@ -392,7 +402,8 @@ function searchMobile() {
   box.innerHTML = `<div class="card">${found.map(e => `<button type="button" data-open="${e.id}" style="margin:0 6px 6px 0">${esc(e.quoteNo)} · ${esc(e.customer||"New")} · ${esc(e.phone||"")}</button>`).join("")}</div>`;
   box.querySelectorAll("[data-open]").forEach(btn => btn.onclick = () => { id = btn.dataset.open; tab = "customer"; render(); });
 }
-document.getElementById("mobileSearch").oninput = ev => { mobileQuery = ev.target.value; searchMobile(); };
+document.getElementById("mobileSearch").oninput = ev => { mobileQuery = ev.target.value; searchCustomers(); };
+document.getElementById("nameSearch").oninput = ev => { nameQuery = ev.target.value; searchCustomers(); };
 try {
   if (!db.enquiries.length) document.getElementById("sampleBtn").onclick();
   else render();
