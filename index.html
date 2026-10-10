@@ -56,6 +56,7 @@
     <div style="flex:1; min-width:180px;"><label>Open enquiry</label><select id="enquiryPick"></select></div>
     <div style="flex:1; min-width:180px;"><label>Search by name</label><input id="nameSearch" placeholder="Customer name"></div>
     <div style="flex:1; min-width:180px;"><label>Search by mobile</label><input id="mobileSearch" inputmode="tel" placeholder="Enter mobile number"></div>
+    <button type="button" class="primary" id="addNewBtn">Add New</button>
     <button type="button" id="sampleBtn">Load sample 33482</button>
   </div>
   <div id="mobileHits"></div>
@@ -374,6 +375,13 @@ document.getElementById("panel").addEventListener("click", ev => {
 });
 document.getElementById("tabs").onclick = ev => { if (ev.target.dataset.tab) { tab = ev.target.dataset.tab; render(); } };
 document.getElementById("newBtn").onclick = () => { const e = blankEnquiry(); e.stock={}; e.received={}; e.taken={}; db.enquiries.unshift(e); id=e.id; tab="customer"; persist(); render(); };
+document.getElementById("addNewBtn").onclick = () => {
+  const e = blankEnquiry();
+  e.customer = nameQuery.trim();
+  e.phone = mobileQuery.trim();
+  e.stock={}; e.received={}; e.taken={};
+  db.enquiries.unshift(e); id=e.id; tab="customer"; persist(); render();
+};
 document.getElementById("saveBtn").onclick = () => { persist(); alert("Saved on this device"); };
 document.getElementById("sampleBtn").onclick = () => {
   const e = blankEnquiry();
