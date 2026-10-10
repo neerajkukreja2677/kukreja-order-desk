@@ -84,7 +84,7 @@ function current() { return db.enquiries.find(e => e.id === id); }
 function blankEnquiry() {
   return { id: "enq-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8), quoteNo: db.nextQuote++, revision: 1, status: "ENQUIRY",
     customer:"", billTo:"", phone:"", site:"", tailor:"", visit:"", issued:new Date().toISOString().slice(0,10), valid:"",
-    token:0, approval:0, openings:[], stock:{}, received:{}, taken:{}, closed:false };
+    token:0, approval:0, selections:[], openings:[], stock:{}, received:{}, taken:{}, closed:false };
 }
 
 function calcOpening(o) {
@@ -126,18 +126,33 @@ function calcOpening(o) {
   }
   return { qty:fabric, unit:"Mtrs", parts };
 }
+function openingQty(o) {
+  const calc = calcOpening(o);
+  const over = o.qtyOverride;
+  const finalQty = over !== "" && over != null && !Number.isNaN(Number(over)) ? Number(over) : calc.qty;
+  return { ...calc, finalQty };
+}
+function selectionRate(e, name) {
+  const hit = (e.selections || []).find(s => s.collection === name);
+  if (hit && hit.rate !== "" && hit.rate != null) return Number(hit.rate);
+  return RATES[name] ?? "";
+}
 function materials(e) {
   const map = new Map();
-  e.openings.forEach(o => calcOpening(o).parts.forEach(p => {
-    if (p.kind === "INCLUDED") return;
-    const key = p.kind + "|" + p.name;
-    if (!map.has(key)) map.set(key, { ...p, qty:0 });
-    map.get(key).qty = rnd(map.get(key).qty + p.qty);
-  }));
+  e.openings.forEach(o => {
+    const calc = openingQty(o);
+    calc.parts.forEach(p => {
+      if (p.kind === "INCLUDED") return;
+      const qty = p.name === (o.collection || "FABRIC") ? calc.finalQty : p.qty;
+      const key = p.kind + "|" + p.name;
+      if (!map.has(key)) map.set(key, { ...p, qty:0 });
+      map.get(key).qty = rnd(map.get(key).qty + qty);
+    });
+  });
   return [...map.values()].map(m => {
     const override = e.stock?.[m.name+"|override"];
-    const finalQty = override !== "" && override != null && !Number.isNaN(Number(override)) && override !== undefined && String(override) !== "" ? Number(override) : m.qty;
-    return { ...m, calculated:m.qty, finalQty, rate:RATES[m.name] ?? "", gst:GST[m.name] || "EXTRA", cutlength:e.stock?.[m.name+"|cut"] || "" };
+    const finalQty = override !== "" && override != null && !Number.isNaN(Number(override)) && String(override) !== "" ? Number(override) : m.qty;
+    return { ...m, calculated:m.qty, finalQty, rate:selectionRate(e, m.name), gst:GST[m.name] || "EXTRA", cutlength:e.stock?.[m.name+"|cut"] || "" };
   });
 }
 function lineAmount(m, discount) {
@@ -159,7 +174,7 @@ function quoteTotals(e) {
 }
 
 function render() {
-  const tabs = [["customer","Customer"],["measure","Measure"],["materials","Qty"],["quote","Quote"],["order","Order"],["godown","Godown"],["bill","Bill"]];
+  const tabs = [["customer","Customer"],["selection","Selection"],["measure","Measure"],["materials","Qty"],["quote","Quote"],["order","Order"],["godown","Godown"],["bill","Bill"]];
   document.getElementById("tabs").innerHTML = tabs.map(([k,l]) => `<button type="button" data-tab="${k}" aria-pressed="${tab===k}">${l}</button>`).join("");
   document.getElementById("enquiryPick").innerHTML = db.enquiries.map(e => `<option value="${e.id}" ${e.id===id?"selected":""}>${e.quoteNo} · ${esc(e.customer||"New")}</option>`).join("") || "<option>No enquiry</option>";
   const e = current();
@@ -174,20 +189,38 @@ const panels = {
       ${field("Token advance", "token", e.token, "number")} ${field("Approval advance %", "approval", e.approval, "number")}
     </div><p class="note">Token can be taken at enquiry. Approval advance is asked after the quote is passed.</p></div>`;
   },
+  selection(e) {
+    e.selections = e.selections || [];
+    const rows = e.selections.map((s,i) => `<tr>
+      <td><input data-s="${i}" data-sk="folder" value="${esc(s.folder)}"></td>
+      <td><input data-s="${i}" data-sk="collection" value="${esc(s.collection)}"></td>
+      <td><select data-s="${i}" data-sk="product">${opt(["CURTAIN","UPHOLSTERY","BLIND","WALLPAPER","FLOOR","POSTER"], s.product||"CURTAIN")}</select></td>
+      <td><input data-s="${i}" data-sk="rate" type="number" value="${esc(s.rate)}"></td>
+      <td><button type="button" data-del-sel="${i}">x</button></td></tr>`).join("");
+    return `<div class="card"><div class="table-wrap"><table><thead><tr><th>Folder no</th><th>Collection</th><th>Product</th><th>Rate</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+      <button type="button" id="addSelection">Add selection</button>
+      <p class="note">Folder number is the register ID. Enter the fabric rate here. Measurement uses this collection.</p></div>`;
+  },
   measure(e) {
-    const rows = e.openings.map((o,i) => `<tr>
+    const picks = (e.selections||[]).map(s => s.collection).filter(Boolean);
+    const rows = e.openings.map((o,i) => {
+      const calc = openingQty(o);
+      return `<tr>
       <td><input data-i="${i}" data-k="room" value="${esc(o.room)}"></td>
-      <td><input data-i="${i}" data-k="folder" value="${esc(o.folder)}"></td>
-      <td><input data-i="${i}" data-k="collection" value="${esc(o.collection)}"></td>
-      <td><select data-i="${i}" data-k="product">${opt(["CURTAIN","UPHOLSTERY","BLIND","WALLPAPER","FLOOR","POSTER"], o.product||"CURTAIN")}</select></td>
+      <td><select data-i="${i}" data-k="collection">${opt(picks.length?picks:[o.collection||""], o.collection||"")}</select></td>
       <td><select data-i="${i}" data-k="style">${opt(["AP","EYELET","ROMAN"], o.style||"AP")}</select></td>
       <td><input data-i="${i}" data-k="width" value="${esc(o.width)}"></td>
       <td><input data-i="${i}" data-k="height" value="${esc(o.height)}"></td>
       <td><select data-i="${i}" data-k="lining">${opt(["","REGULAR LINING","DIMOUT LINING"], o.lining||"")}</select></td>
       <td><select data-i="${i}" data-k="hardware">${opt(["NONE","NDL","MOTORISED","ROMAN"], o.hardware||"NONE")}</select></td>
-      <td><button type="button" data-del="${i}">x</button></td></tr>`).join("");
-    return `<div class="card"><div class="table-wrap"><table><thead><tr><th>Room</th><th>Folder</th><th>Collection</th><th>Product</th><th>Style</th><th>Width in</th><th>Height in</th><th>Lining</th><th>Hardware</th><th></th></tr></thead><tbody>${rows}</tbody></table>
-      </div><button type="button" id="addOpening">Add opening</button></div><p class="note">Only width and height are punched. Splits do not multiply fabric. Coverage follows the workbook: 22 in American pleat and eyelet, 48 in Roman, scaled to fabric width.</p></div>`;
+      <td>${calc.qty || ""}</td>
+      <td><input data-i="${i}" data-k="qtyOverride" value="${esc(o.qtyOverride||"")}"></td>
+      <td>${calc.finalQty || ""}</td>
+      <td><button type="button" data-del="${i}">x</button></td></tr>`;
+    }).join("");
+    return `<div class="card"><div class="table-wrap"><table><thead><tr><th>Room</th><th>Collection</th><th>Style</th><th>Width in</th><th>Height in</th><th>Lining</th><th>Hardware</th><th>Calculated</th><th>Override</th><th>Final</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+      </div><button type="button" id="addOpening">Add opening</button>
+      <p class="note">Only width and height are punched. Calculated qty follows the workbook. Type in Override to replace that opening's fabric qty.</p></div>`;
   },
   materials(e) {
     const lines = materials(e);
@@ -247,7 +280,8 @@ function onPanel(ev) {
   const e = current(); if (!e) return;
   const t = ev.target;
   if (t.dataset.field) { e[t.dataset.field] = t.type==="number" ? Number(t.value||0) : t.value; persist(); document.getElementById("statusLine").textContent = `${e.quoteNo} / REV ${e.revision} · ${e.status}`; return; }
-  if (t.dataset.k) { e.openings[t.dataset.i][t.dataset.k] = t.value; persist(); }
+  if (t.dataset.sk) { e.selections[t.dataset.s][t.dataset.sk] = t.value; persist(); }
+  if (t.dataset.k) { e.openings[t.dataset.i][t.dataset.k] = t.value; persist(); if (t.dataset.k==="qtyOverride" && ev.type==="change") render(); }
   if (t.dataset.over != null && ev.type==="change") { e.stock[t.dataset.over+"|override"] = t.value; persist(); render(); }
   if (t.dataset.rec != null) { e.received[t.dataset.rec] = t.value; e.status = "INWARD"; persist(); }
   if (t.dataset.taken != null) { e.taken[t.dataset.taken] = t.value; persist(); }
@@ -256,7 +290,9 @@ document.getElementById("panel").addEventListener("input", onPanel);
 document.getElementById("panel").addEventListener("change", onPanel);
 document.getElementById("panel").addEventListener("click", ev => {
   const e = current(); const t = ev.target;
-  if (t.id==="addOpening") { e.openings.push({room:"",folder:"",collection:"",product:"CURTAIN",style:"AP",width:"",height:"",fabricWidth:54,liningWidth:54,hem:12,repeat:0,extra:0,splits:1,lining:"",hardware:"NDL",coverage:""}); persist(); render(); }
+  if (t.id==="addSelection") { e.selections = e.selections || []; e.selections.push({folder:"",collection:"",product:"CURTAIN",rate:""}); persist(); render(); }
+  if (t.dataset.delSel) { e.selections.splice(Number(t.dataset.delSel),1); persist(); render(); }
+  if (t.id==="addOpening") { const first = (e.selections||[])[0]||{}; e.openings.push({room:"",folder:first.folder||"",collection:first.collection||"",product:first.product||"CURTAIN",style:"AP",width:"",height:"",fabricWidth:54,liningWidth:54,hem:12,repeat:0,extra:0,splits:1,lining:"",hardware:"NDL",coverage:"",qtyOverride:""}); persist(); render(); }
   if (t.dataset.del) { e.openings.splice(Number(t.dataset.del),1); persist(); render(); }
   if (t.id==="printQuote") printQuote();
   if (t.id==="printSlip") printSlip();
@@ -275,7 +311,7 @@ document.getElementById("saveBtn").onclick = () => { persist(); alert("Saved on 
 document.getElementById("sampleBtn").onclick = () => {
   const e = blankEnquiry();
   e.quoteNo = 33482; e.customer = "AMOL CHAUDHARI"; e.billTo = "SNEH RESORT"; e.phone = "838001623"; e.issued = "2026-10-08"; e.valid = "2026-10-15";
-  e.openings = SAMPLE; e.stock={}; e.received={}; e.taken={}; e.status = "MEASURED";
+  e.openings = SAMPLE; e.selections = [...new Map(SAMPLE.map(o => [o.collection, {folder:o.folder, collection:o.collection, product:o.product, rate:RATES[o.collection]||""}])).values()]; e.stock={}; e.received={}; e.taken={}; e.status = "MEASURED";
   db.enquiries.unshift(e); id=e.id; tab="customer"; persist(); render();
 };
 document.getElementById("enquiryPick").onchange = ev => { id = ev.target.value; render(); };
