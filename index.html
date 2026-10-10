@@ -87,7 +87,7 @@ function current() { return db.enquiries.find(e => e.id === id); }
 function blankEnquiry() {
   return { id: "enq-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8), quoteNo: db.nextQuote++, revision: 1, status: "ENQUIRY",
     customer:"", billTo:"", phone:"", site:"", tailor:"", visit:"", issued:new Date().toISOString().slice(0,10), valid:"",
-    token:0, approval:0, selections:[], openings:[], stock:{}, received:{}, taken:{}, closed:false };
+    token:0, approval:0, discount:0, orderNo:"", orderDate:"", delivery:"", terms:"", gstMode:"EXTRA", orderRemarks:"", selections:[], openings:[], stock:{}, received:{}, taken:{}, closed:false };
 }
 
 function calcOpening(o) {
@@ -178,7 +178,7 @@ function quoteTotals(e) {
 }
 
 function render() {
-  const tabs = [["customer","Customer"],["selection","Selection"],["measure","Measure"],["materials","Qty"],["quote","Quote"],["order","Order"],["godown","Godown"],["bill","Bill"]];
+  const tabs = [["customer","Customer"],["selection","Selection"],["measure","Measure"],["materials","Qty"],["quote","Quote"],["details","Order details"],["order","Order"],["godown","Godown"],["bill","Bill"]];
   document.getElementById("tabs").innerHTML = tabs.map(([k,l]) => `<button type="button" data-tab="${k}" aria-pressed="${tab===k}">${l}</button>`).join("");
   const e = current();
   const fab = e ? materials(e).filter(m => m.unit==="Mtrs" && !m.name.includes("LINING")).reduce((s,m)=>s+m.finalQty,0) : 0;
@@ -250,6 +250,17 @@ const panels = {
       <div class="table-wrap"><table><thead><tr><th>Type</th><th>Particulars</th><th>Qty</th><th>Unit</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table>
       </div><button type="button" id="printQuote">Print quotation</button> <button type="button" id="passQuote">Mark quote passed</button>
       <p class="note">Print can be read by type. Room grouping is on the measurement sheet. Amounts stay pending while a rate is missing.</p></div>`;
+  },
+  details(e) {
+    const t = quoteTotals(e);
+    return `<div class="card"><div class="grid">
+      ${field("Sales order no", "orderNo", e.orderNo||"")} ${field("Order date", "orderDate", e.orderDate||"", "date")} ${field("Delivery date", "delivery", e.delivery||"", "date")} ${field("GST mode", "gstMode", e.gstMode||"EXTRA")}
+      ${field("Contact person", "contact", e.contact||"")} ${field("Phone", "phone", e.phone)} ${field("Site", "site", e.site)} ${field("Tailor", "tailor", e.tailor)}
+      ${field("Token received", "token", e.token, "number")} ${field("Approval advance %", "approval", e.approval, "number")} ${field("Discount %", "discount", e.discount||0, "number")} ${field("Payment terms", "terms", e.terms||"")}
+    </div>
+    <div style="margin-top:10px">${field("Order remarks", "orderRemarks", e.orderRemarks||"")}</div>
+    <p class="ok">${(e.selections||[]).length} selections · ${e.openings.length} openings · Payable ${t.missing?"PENDING":money(t.payable)}</p>
+    <p class="note">This is the sales-order header. Quote and measurement stay on their own tabs.</p></div>`;
   },
   order(e) {
     return `<div class="card"><p>Status: <b>${e.status}</b></p><button type="button" id="toOrder">Convert to sales order and assign cutlengths</button>
@@ -350,6 +361,7 @@ document.getElementById("saveBtn").onclick = () => { persist(); alert("Saved on 
 document.getElementById("sampleBtn").onclick = () => {
   const e = blankEnquiry();
   e.quoteNo = 33482; e.customer = "AMOL CHAUDHARI"; e.billTo = "SNEH RESORT"; e.phone = "838001623"; e.issued = "2026-10-08"; e.valid = "2026-10-15";
+  e.orderNo = "SO-33482"; e.orderDate = "2026-10-08"; e.delivery = "2026-10-20"; e.terms = "Token now, balance before install"; e.gstMode = "EXTRA";
   e.openings = SAMPLE; e.selections = [...new Map(SAMPLE.map(o => [o.collection, {folder:o.folder, collection:o.collection, product:o.product, rate:RATES[o.collection]||""}])).values()]; e.stock={}; e.received={}; e.taken={}; e.status = "MEASURED";
   db.enquiries.unshift(e); id=e.id; tab="customer"; persist(); render();
 };
