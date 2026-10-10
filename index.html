@@ -184,7 +184,6 @@ function render() {
   const fab = e ? materials(e).filter(m => m.unit==="Mtrs" && !m.name.includes("LINING")).reduce((s,m)=>s+m.finalQty,0) : 0;
   document.getElementById("chips").innerHTML = e ? `<span>${(e.selections||[]).length} selections</span><span>${e.openings.length} openings</span><span>${rnd(fab)} m fabric</span><span>${e.discount||0}% discount</span>` : "";
   document.getElementById("enquiryPick").innerHTML = db.enquiries.map(e => `<option value="${e.id}" ${e.id===id?"selected":""}>${e.quoteNo} · ${esc(e.customer||"New")}</option>`).join("") || "<option>No enquiry</option>";
-  const e = current();
   document.getElementById("statusLine").textContent = e ? `${e.quoteNo} / REV ${e.revision} · ${e.status}` : "No enquiry open";
   document.getElementById("panel").innerHTML = e ? panels[tab](e) : "<div class='card'>Create an enquiry or load sample 33482.</div>";
 }
