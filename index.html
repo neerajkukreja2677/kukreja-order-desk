@@ -256,7 +256,9 @@ const panels = {
   quote(e) {
     const t = quoteTotals(e);
     const rows = t.lines.map(m => `<tr><td>${esc(m.kind)}</td><td>${esc(m.name)}</td><td>${m.finalQty}</td><td>${esc(m.unit)}</td><td>${m.rate===""?"—":m.rate}</td><td>${lineAmount(m,0)==null?"PENDING":money(lineAmount(m,0))}</td></tr>`).join("");
-    return `<div class="card"><div class="grid" style="margin-bottom:10px;">${field("Discount %", "discount", e.discount||0, "number")}</div>
+    return `<div class="card">
+      <p><b>${esc(e.customer||"Customer name missing")}</b> · Bill to ${esc(e.billTo||"—")} · ${esc(e.phone||"no mobile")} · Quote ${esc(e.quoteNo)}</p>
+      <div class="grid" style="margin-bottom:10px;">${field("Customer name", "customer", e.customer)} ${field("Bill to", "billTo", e.billTo)} ${field("Discount %", "discount", e.discount||0, "number")}</div>
       <div class="totals"><span>Taxable <b>${t.missing?"PENDING":money(t.taxable)}</b></span><span>Payable <b>${t.missing?"PENDING":money(t.payable)}</b></span></div>
       <div class="table-wrap"><table><thead><tr><th>Type</th><th>Particulars</th><th>Qty</th><th>Unit</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table>
       </div><button type="button" id="printQuote">Print quotation</button> <button type="button" id="passQuote">Mark quote passed</button>
@@ -265,8 +267,8 @@ const panels = {
   details(e) {
     const t = quoteTotals(e);
     return `<div class="card"><div class="grid">
-      ${field("Sales order no", "orderNo", e.orderNo||"")} ${field("Order date", "orderDate", e.orderDate||"", "date")} ${field("Delivery date", "delivery", e.delivery||"", "date")} ${field("GST mode", "gstMode", e.gstMode||"EXTRA")}
-      ${field("Contact person", "contact", e.contact||"")} ${field("Phone", "phone", e.phone)} ${field("Site", "site", e.site)} ${field("Tailor", "tailor", e.tailor)}
+      ${field("Customer name", "customer", e.customer)} ${field("Bill to", "billTo", e.billTo)} ${field("Sales order no", "orderNo", e.orderNo||"")} ${field("Order date", "orderDate", e.orderDate||"", "date")}
+      ${field("Delivery date", "delivery", e.delivery||"", "date")} ${field("GST mode", "gstMode", e.gstMode||"EXTRA")} ${field("Contact person", "contact", e.contact||"")} ${field("Phone", "phone", e.phone)} ${field("Site", "site", e.site)} ${field("Tailor", "tailor", e.tailor)}
       ${field("Token received", "token", e.token, "number")} ${field("Approval advance %", "approval", e.approval, "number")} ${field("Discount %", "discount", e.discount||0, "number")} ${field("Payment terms", "terms", e.terms||"")}
     </div>
     <div style="margin-top:10px">${field("Order remarks", "orderRemarks", e.orderRemarks||"")}</div>
@@ -312,7 +314,8 @@ function printMeasure() {
 function printQuote() {
   const e = current(); const t = quoteTotals(e);
   document.getElementById("printSheet").innerHTML = `<h1>QUOTATION ${e.quoteNo} / REV ${e.revision}</h1>
-    <p>Customer: ${esc(e.customer)} · Bill to: ${esc(e.billTo)} · Phone: ${esc(e.phone)}</p>
+    <p><b>Customer name: ${esc(e.customer||"")}</b></p>
+    <p>Bill to: ${esc(e.billTo)} · Phone: ${esc(e.phone)} · Site: ${esc(e.site||"")}</p>
     <div class="table-wrap"><table><thead><tr><th>Type</th><th>Particulars</th><th>Qty</th><th>Unit</th><th>Rate</th><th>Amount</th></tr></thead>
     <tbody>${t.lines.map(m => `<tr><td>${esc(m.kind)}</td><td>${esc(m.name)}</td><td>${m.finalQty}</td><td>${esc(m.unit)}</td><td>${m.rate===""?"":m.rate}</td><td>${lineAmount(m,0)==null?"PENDING":money(lineAmount(m,0))}</td></tr>`).join("")}</tbody></table>
     <p style="text-align:right">Payable ${t.missing?"PENDING":money(t.payable)}</p>`;
