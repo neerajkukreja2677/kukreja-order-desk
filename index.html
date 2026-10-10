@@ -376,14 +376,26 @@ document.getElementById("panel").addEventListener("click", ev => {
   if (t.id==="closeOrder") { e.status="CLOSED"; e.closed=true; persist(); render(); }
 });
 document.getElementById("tabs").onclick = ev => { if (ev.target.dataset.tab) { tab = ev.target.dataset.tab; render(); } };
-document.getElementById("newBtn").onclick = () => { const e = blankEnquiry(); e.stock={}; e.received={}; e.taken={}; db.enquiries.unshift(e); id=e.id; tab="customer"; persist(); render(); };
-document.getElementById("addNewBtn").onclick = () => {
+function startNewEnquiry() {
+  const nameBox = document.getElementById("nameSearch");
+  const mobileBox = document.getElementById("mobileSearch");
+  const name = (nameBox && nameBox.value || nameQuery || "").trim();
+  const phone = (mobileBox && mobileBox.value || mobileQuery || "").trim();
   const e = blankEnquiry();
-  e.customer = nameQuery.trim();
-  e.phone = mobileQuery.trim();
-  e.stock={}; e.received={}; e.taken={};
-  db.enquiries.unshift(e); id=e.id; tab="customer"; persist(); render();
-};
+  e.customer = name;
+  e.billTo = name;
+  e.phone = phone;
+  e.stock = {}; e.received = {}; e.taken = {};
+  db.enquiries.unshift(e);
+  id = e.id;
+  tab = "customer";
+  nameQuery = "";
+  mobileQuery = "";
+  persist();
+  render();
+}
+document.getElementById("newBtn").onclick = startNewEnquiry;
+document.getElementById("addNewBtn").onclick = startNewEnquiry;
 function editOpenEnquiry() {
   const open = current();
   if (!open) return alert("Select an enquiry first");
@@ -416,11 +428,7 @@ function searchCustomers() {
   if (!found.length) {
     const label = [n && nameQuery.trim(), d && q].filter(Boolean).join(" · ");
     box.innerHTML = `<div class="card"><p>No enquiry for ${esc(label)}. <button type="button" id="newFromSearch">Start new enquiry</button></p></div>`;
-    document.getElementById("newFromSearch").onclick = () => {
-      const e = blankEnquiry();
-      e.customer = nameQuery.trim(); e.phone = q; e.stock={}; e.received={}; e.taken={};
-      db.enquiries.unshift(e); id=e.id; tab="customer"; persist(); render();
-    };
+    document.getElementById("newFromSearch").onclick = startNewEnquiry;
     return;
   }
   box.innerHTML = `<div class="card">${found.map(e => `<button type="button" data-open="${e.id}" style="margin:0 6px 6px 0">${esc(e.quoteNo)} · ${esc(e.customer||"New")} · ${esc(e.phone||"")}</button>`).join("")}</div>`;
