@@ -195,7 +195,7 @@ function render() {
   const nameBox = document.getElementById("nameSearch");
   if (nameBox && document.activeElement !== nameBox) nameBox.value = nameQuery;
   searchCustomers();
-  document.getElementById("statusLine").textContent = e ? `${e.quoteNo} / REV ${e.revision} · ${e.status}` : "No enquiry open";
+  document.getElementById("statusLine").textContent = e ? `${e.customer||"No customer"} · ${e.quoteNo} / REV ${e.revision} · ${e.status}` : "No enquiry open";
   document.getElementById("panel").innerHTML = e ? panels[tab](e) : "<div class='card'>Create an enquiry or load sample 33482.</div>";
 }
 const panels = {
@@ -299,14 +299,16 @@ function opt(list, value) { return list.map(v => `<option ${v===value?"selected"
 
 function printSelection() {
   const e = current();
-  document.getElementById("printSheet").innerHTML = `<h1>SELECTION ${e.quoteNo}</h1><p>${esc(e.customer)} · ${esc(e.site)}</p>
+  document.getElementById("printSheet").innerHTML = `<h1>SELECTION ${e.quoteNo}</h1>
+    <p><b>Customer name: ${esc(e.customer||"")}</b></p><p>Site: ${esc(e.site||"")} · Phone: ${esc(e.phone||"")}</p>
     <table><thead><tr><th>Folder</th><th>Collection</th><th>Design</th><th>Product</th><th>Width</th><th>Rate</th><th>GST</th><th>Remarks</th></tr></thead>
     <tbody>${(e.selections||[]).map(s => `<tr><td>${esc(s.folder)}</td><td>${esc(s.collection)}</td><td>${esc(s.design||"")}</td><td>${esc(s.product)}</td><td>${esc(s.fabricWidth||"")}</td><td>${esc(s.rate)}</td><td>${esc(s.gst||"")}</td><td>${esc(s.remarks||"")}</td></tr>`).join("")}</tbody></table>`;
   window.print();
 }
 function printMeasure() {
   const e = current();
-  document.getElementById("printSheet").innerHTML = `<h1>MEASUREMENT ${e.quoteNo}</h1><p>${esc(e.customer)} · Tailor ${esc(e.tailor)}</p>
+  document.getElementById("printSheet").innerHTML = `<h1>MEASUREMENT ${e.quoteNo}</h1>
+    <p><b>Customer name: ${esc(e.customer||"")}</b></p><p>Tailor: ${esc(e.tailor||"")} · Phone: ${esc(e.phone||"")}</p>
     <table><thead><tr><th>Room</th><th>Opening</th><th>Collection</th><th>Style</th><th>W</th><th>H</th><th>Calculated</th><th>Override</th><th>Final</th></tr></thead>
     <tbody>${e.openings.map(o => { const c = openingQty(o); return `<tr><td>${esc(o.room)}</td><td>${esc(o.opening||"")}</td><td>${esc(o.collection)}</td><td>${esc(o.style)}</td><td>${esc(o.width)}</td><td>${esc(o.height)}</td><td>${c.qty}</td><td>${esc(o.qtyOverride||"")}</td><td>${c.finalQty}</td></tr>`; }).join("")}</tbody></table>`;
   window.print();
@@ -324,7 +326,8 @@ function printQuote() {
 function printSlip() {
   const e = current();
   const lines = materials(e).filter(m => m.kind!=="LABOUR");
-  document.getElementById("printSheet").innerHTML = `<h1>CUTTING SLIP</h1><p>Order ${e.quoteNo} · Tailor ${esc(e.tailor)} · ${esc(e.customer)}</p>
+  document.getElementById("printSheet").innerHTML = `<h1>CUTTING SLIP</h1>
+    <p><b>Customer name: ${esc(e.customer||"")}</b></p><p>Order ${e.quoteNo} · Tailor ${esc(e.tailor||"")} · Phone ${esc(e.phone||"")}</p>
     <table><thead><tr><th>Cutlength</th><th>Item</th><th>Qty</th><th>Received</th><th>Taken</th></tr></thead>
     <tbody>${lines.map(m => `<tr><td>${esc(m.cutlength||"")}</td><td>${esc(m.name)}</td><td>${m.finalQty}</td><td>${esc(e.received?.[m.name]||"")}</td><td>${esc(e.taken?.[m.name]||"")}</td></tr>`).join("")}</tbody></table>`;
   window.print();
