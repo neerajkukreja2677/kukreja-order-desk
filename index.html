@@ -49,6 +49,7 @@
   <div>
     <button class="primary" id="newBtn" type="button">Add New Enquiry</button>
     <button class="ghost" id="editBtn" type="button">Edit</button>
+    <button class="ghost" id="printBtn" type="button">Print</button>
     <button class="primary" id="saveBtn" type="button">Save</button>
   </div>
 </header>
@@ -402,7 +403,22 @@ function editOpenEnquiry() {
   tab = "customer";
   render();
 }
+function printCurrent() {
+  const e = current();
+  if (!e) return alert("Open an enquiry first");
+  if (tab === "selection") return printSelection();
+  if (tab === "measure") return printMeasure();
+  if (tab === "quote") return printQuote();
+  if (tab === "godown" || tab === "order") return printSlip();
+  document.getElementById("printSheet").innerHTML = `<h1>${esc(e.quoteNo)} · ${esc(e.status)}</h1>
+    <p><b>Customer name: ${esc(e.customer||"")}</b></p>
+    <p>Bill to: ${esc(e.billTo||"")} · Phone: ${esc(e.phone||"")} · Site: ${esc(e.site||"")}</p>
+    <p>Order: ${esc(e.orderNo||"—")} · Delivery: ${esc(e.delivery||"—")} · Tailor: ${esc(e.tailor||"—")}</p>`;
+  window.print();
+}
 document.getElementById("editBtn").onclick = editOpenEnquiry;
+document.getElementById("editMainBtn").onclick = editOpenEnquiry;
+document.getElementById("printBtn").onclick = printCurrent;
 document.getElementById("editMainBtn").onclick = editOpenEnquiry;
 document.getElementById("saveBtn").onclick = () => { persist(); alert("Saved on this device"); };
 document.getElementById("sampleBtn").onclick = () => {
