@@ -16,7 +16,9 @@
   button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
   button.ghost { background:transparent; color:#f6efe6; border-color:#6d5c4d; }
   main { max-width:1180px; margin:0 auto; padding:14px; }
-  .tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; position:sticky; top:62px; z-index:1; background:var(--paper); padding:6px 0; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  .chips span { background:#fff; border:1px solid var(--line); border-radius:999px; padding:4px 10px; font-size:12px; }
   .tabs button[aria-pressed="true"] { background:var(--green); color:#fff; border-color:var(--green); }
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px; }
   .grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; }
@@ -55,6 +57,7 @@
     <button type="button" id="sampleBtn">Load sample 33482</button>
   </div>
   <div class="tabs" id="tabs"></div>
+  <div class="chips" id="chips"></div>
   <section id="panel"><div class="card">Loading enquiry...</div></section>
 </main>
 <section id="printSheet"></section>
@@ -152,7 +155,8 @@ function materials(e) {
   return [...map.values()].map(m => {
     const override = e.stock?.[m.name+"|override"];
     const finalQty = override !== "" && override != null && !Number.isNaN(Number(override)) && String(override) !== "" ? Number(override) : m.qty;
-    return { ...m, calculated:m.qty, finalQty, rate:selectionRate(e, m.name), gst:GST[m.name] || "EXTRA", cutlength:e.stock?.[m.name+"|cut"] || "" };
+    const sel = (e.selections || []).find(s => s.collection === m.name);
+    return { ...m, calculated:m.qty, finalQty, rate:selectionRate(e, m.name), gst:sel?.gst || GST[m.name] || "EXTRA", cutlength:e.stock?.[m.name+"|cut"] || "" };
   });
 }
 function lineAmount(m, discount) {
@@ -164,7 +168,7 @@ function quoteTotals(e) {
   const lines = materials(e);
   let taxable = 0, gst = 0, payable = 0, missing = 0;
   lines.forEach(m => {
-    const amt = lineAmount(m, 0);
+    const amt = lineAmount(m, e.discount || 0);
     if (amt == null) { missing++; return; }
     const rate = Number(m.rate), g = 0;
     if (m.gst === "INC") { taxable += amt; payable += amt; }
@@ -176,6 +180,9 @@ function quoteTotals(e) {
 function render() {
   const tabs = [["customer","Customer"],["selection","Selection"],["measure","Measure"],["materials","Qty"],["quote","Quote"],["order","Order"],["godown","Godown"],["bill","Bill"]];
   document.getElementById("tabs").innerHTML = tabs.map(([k,l]) => `<button type="button" data-tab="${k}" aria-pressed="${tab===k}">${l}</button>`).join("");
+  const e = current();
+  const fab = e ? materials(e).filter(m => m.unit==="Mtrs" && !m.name.includes("LINING")).reduce((s,m)=>s+m.finalQty,0) : 0;
+  document.getElementById("chips").innerHTML = e ? `<span>${(e.selections||[]).length} selections</span><span>${e.openings.length} openings</span><span>${rnd(fab)} m fabric</span><span>${e.discount||0}% discount</span>` : "";
   document.getElementById("enquiryPick").innerHTML = db.enquiries.map(e => `<option value="${e.id}" ${e.id===id?"selected":""}>${e.quoteNo} · ${esc(e.customer||"New")}</option>`).join("") || "<option>No enquiry</option>";
   const e = current();
   document.getElementById("statusLine").textContent = e ? `${e.quoteNo} / REV ${e.revision} · ${e.status}` : "No enquiry open";
@@ -194,33 +201,40 @@ const panels = {
     const rows = e.selections.map((s,i) => `<tr>
       <td><input data-s="${i}" data-sk="folder" value="${esc(s.folder)}"></td>
       <td><input data-s="${i}" data-sk="collection" value="${esc(s.collection)}"></td>
+      <td><input data-s="${i}" data-sk="design" value="${esc(s.design||"")}"></td>
       <td><select data-s="${i}" data-sk="product">${opt(["CURTAIN","UPHOLSTERY","BLIND","WALLPAPER","FLOOR","POSTER"], s.product||"CURTAIN")}</select></td>
+      <td><input data-s="${i}" data-sk="fabricWidth" value="${esc(s.fabricWidth||54)}"></td>
       <td><input data-s="${i}" data-sk="rate" type="number" value="${esc(s.rate)}"></td>
+      <td><select data-s="${i}" data-sk="gst">${opt(["EXTRA","INC"], s.gst||"EXTRA")}</select></td>
+      <td><input data-s="${i}" data-sk="remarks" value="${esc(s.remarks||"")}"></td>
       <td><button type="button" data-del-sel="${i}">x</button></td></tr>`).join("");
-    return `<div class="card"><div class="table-wrap"><table><thead><tr><th>Folder no</th><th>Collection</th><th>Product</th><th>Rate</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
-      <button type="button" id="addSelection">Add selection</button>
-      <p class="note">Folder number is the register ID. Enter the fabric rate here. Measurement uses this collection.</p></div>`;
+    return `<div class="card"><div class="table-wrap"><table><thead><tr><th>Folder</th><th>Collection</th><th>Design</th><th>Product</th><th>Width in</th><th>Rate</th><th>GST</th><th>Remarks</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+      <button type="button" id="addSelection">Add selection</button> <button type="button" id="printSelection">Print selection</button>
+      <p class="note">Folder number is the register ID. Rate entered here is used on the quote. Width is used when this collection is measured.</p></div>`;
   },
   measure(e) {
     const picks = (e.selections||[]).map(s => s.collection).filter(Boolean);
     const rows = e.openings.map((o,i) => {
       const calc = openingQty(o);
+      const rate = selectionRate(e, o.collection);
       return `<tr>
       <td><input data-i="${i}" data-k="room" value="${esc(o.room)}"></td>
+      <td><input data-i="${i}" data-k="opening" value="${esc(o.opening||"")}"></td>
       <td><select data-i="${i}" data-k="collection">${opt(picks.length?picks:[o.collection||""], o.collection||"")}</select></td>
       <td><select data-i="${i}" data-k="style">${opt(["AP","EYELET","ROMAN"], o.style||"AP")}</select></td>
       <td><input data-i="${i}" data-k="width" value="${esc(o.width)}"></td>
       <td><input data-i="${i}" data-k="height" value="${esc(o.height)}"></td>
       <td><select data-i="${i}" data-k="lining">${opt(["","REGULAR LINING","DIMOUT LINING"], o.lining||"")}</select></td>
       <td><select data-i="${i}" data-k="hardware">${opt(["NONE","NDL","MOTORISED","ROMAN"], o.hardware||"NONE")}</select></td>
+      <td>${rate===""?"—":rate}</td>
       <td>${calc.qty || ""}</td>
       <td><input data-i="${i}" data-k="qtyOverride" value="${esc(o.qtyOverride||"")}"></td>
       <td>${calc.finalQty || ""}</td>
-      <td><button type="button" data-del="${i}">x</button></td></tr>`;
+      <td><button type="button" data-dup="${i}">copy</button> <button type="button" data-del="${i}">x</button></td></tr>`;
     }).join("");
-    return `<div class="card"><div class="table-wrap"><table><thead><tr><th>Room</th><th>Collection</th><th>Style</th><th>Width in</th><th>Height in</th><th>Lining</th><th>Hardware</th><th>Calculated</th><th>Override</th><th>Final</th><th></th></tr></thead><tbody>${rows}</tbody></table>
-      </div><button type="button" id="addOpening">Add opening</button>
-      <p class="note">Only width and height are punched. Calculated qty follows the workbook. Type in Override to replace that opening's fabric qty.</p></div>`;
+    return `<div class="card"><div class="table-wrap"><table><thead><tr><th>Room</th><th>Opening</th><th>Collection</th><th>Style</th><th>Width</th><th>Height</th><th>Lining</th><th>Hardware</th><th>Rate</th><th>Calculated</th><th>Override</th><th>Final</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+      </div><button type="button" id="addOpening">Add opening</button> <button type="button" id="printMeasure">Print measurement</button>
+      <p class="note">Punch width and height in inches. Calculated qty updates when you leave the box. Override replaces that opening's fabric qty only.</p></div>`;
   },
   materials(e) {
     const lines = materials(e);
@@ -232,7 +246,8 @@ const panels = {
   quote(e) {
     const t = quoteTotals(e);
     const rows = t.lines.map(m => `<tr><td>${esc(m.kind)}</td><td>${esc(m.name)}</td><td>${m.finalQty}</td><td>${esc(m.unit)}</td><td>${m.rate===""?"—":m.rate}</td><td>${lineAmount(m,0)==null?"PENDING":money(lineAmount(m,0))}</td></tr>`).join("");
-    return `<div class="card"><div class="totals"><span>Taxable <b>${t.missing?"PENDING":money(t.taxable)}</b></span><span>Payable <b>${t.missing?"PENDING":money(t.payable)}</b></span></div>
+    return `<div class="card"><div class="grid" style="margin-bottom:10px;">${field("Discount %", "discount", e.discount||0, "number")}</div>
+      <div class="totals"><span>Taxable <b>${t.missing?"PENDING":money(t.taxable)}</b></span><span>Payable <b>${t.missing?"PENDING":money(t.payable)}</b></span></div>
       <div class="table-wrap"><table><thead><tr><th>Type</th><th>Particulars</th><th>Qty</th><th>Unit</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table>
       </div><button type="button" id="printQuote">Print quotation</button> <button type="button" id="passQuote">Mark quote passed</button>
       <p class="note">Print can be read by type. Room grouping is on the measurement sheet. Amounts stay pending while a rate is missing.</p></div>`;
@@ -259,6 +274,20 @@ const panels = {
 function field(label, key, value, type="text") { return `<div><label>${label}</label><input data-field="${key}" type="${type}" value="${esc(value)}"></div>`; }
 function opt(list, value) { return list.map(v => `<option ${v===value?"selected":""}>${esc(v)}</option>`).join(""); }
 
+function printSelection() {
+  const e = current();
+  document.getElementById("printSheet").innerHTML = `<h1>SELECTION ${e.quoteNo}</h1><p>${esc(e.customer)} · ${esc(e.site)}</p>
+    <table><thead><tr><th>Folder</th><th>Collection</th><th>Design</th><th>Product</th><th>Width</th><th>Rate</th><th>GST</th><th>Remarks</th></tr></thead>
+    <tbody>${(e.selections||[]).map(s => `<tr><td>${esc(s.folder)}</td><td>${esc(s.collection)}</td><td>${esc(s.design||"")}</td><td>${esc(s.product)}</td><td>${esc(s.fabricWidth||"")}</td><td>${esc(s.rate)}</td><td>${esc(s.gst||"")}</td><td>${esc(s.remarks||"")}</td></tr>`).join("")}</tbody></table>`;
+  window.print();
+}
+function printMeasure() {
+  const e = current();
+  document.getElementById("printSheet").innerHTML = `<h1>MEASUREMENT ${e.quoteNo}</h1><p>${esc(e.customer)} · Tailor ${esc(e.tailor)}</p>
+    <table><thead><tr><th>Room</th><th>Opening</th><th>Collection</th><th>Style</th><th>W</th><th>H</th><th>Calculated</th><th>Override</th><th>Final</th></tr></thead>
+    <tbody>${e.openings.map(o => { const c = openingQty(o); return `<tr><td>${esc(o.room)}</td><td>${esc(o.opening||"")}</td><td>${esc(o.collection)}</td><td>${esc(o.style)}</td><td>${esc(o.width)}</td><td>${esc(o.height)}</td><td>${c.qty}</td><td>${esc(o.qtyOverride||"")}</td><td>${c.finalQty}</td></tr>`; }).join("")}</tbody></table>`;
+  window.print();
+}
 function printQuote() {
   const e = current(); const t = quoteTotals(e);
   document.getElementById("printSheet").innerHTML = `<h1>QUOTATION ${e.quoteNo} / REV ${e.revision}</h1>
@@ -281,7 +310,15 @@ function onPanel(ev) {
   const t = ev.target;
   if (t.dataset.field) { e[t.dataset.field] = t.type==="number" ? Number(t.value||0) : t.value; persist(); document.getElementById("statusLine").textContent = `${e.quoteNo} / REV ${e.revision} · ${e.status}`; return; }
   if (t.dataset.sk) { e.selections[t.dataset.s][t.dataset.sk] = t.value; persist(); }
-  if (t.dataset.k) { e.openings[t.dataset.i][t.dataset.k] = t.value; persist(); if (t.dataset.k==="qtyOverride" && ev.type==="change") render(); }
+  if (t.dataset.k) {
+    e.openings[t.dataset.i][t.dataset.k] = t.value;
+    if (t.dataset.k === "collection") {
+      const sel = (e.selections||[]).find(s => s.collection === t.value);
+      if (sel) { e.openings[t.dataset.i].folder = sel.folder || ""; e.openings[t.dataset.i].product = sel.product || "CURTAIN"; e.openings[t.dataset.i].fabricWidth = sel.fabricWidth || 54; }
+    }
+    persist();
+    if (ev.type === "change") render();
+  }
   if (t.dataset.over != null && ev.type==="change") { e.stock[t.dataset.over+"|override"] = t.value; persist(); render(); }
   if (t.dataset.rec != null) { e.received[t.dataset.rec] = t.value; e.status = "INWARD"; persist(); }
   if (t.dataset.taken != null) { e.taken[t.dataset.taken] = t.value; persist(); }
@@ -290,8 +327,11 @@ document.getElementById("panel").addEventListener("input", onPanel);
 document.getElementById("panel").addEventListener("change", onPanel);
 document.getElementById("panel").addEventListener("click", ev => {
   const e = current(); const t = ev.target;
-  if (t.id==="addSelection") { e.selections = e.selections || []; e.selections.push({folder:"",collection:"",product:"CURTAIN",rate:""}); persist(); render(); }
+  if (t.id==="addSelection") { e.selections = e.selections || []; e.selections.push({folder:"",collection:"",design:"",product:"CURTAIN",fabricWidth:54,rate:"",gst:"EXTRA",remarks:""}); persist(); render(); }
   if (t.dataset.delSel) { e.selections.splice(Number(t.dataset.delSel),1); persist(); render(); }
+  if (t.dataset.dup) { e.openings.splice(Number(t.dataset.dup)+1, 0, {...e.openings[t.dataset.dup], qtyOverride:""}); persist(); render(); }
+  if (t.id==="printSelection") printSelection();
+  if (t.id==="printMeasure") printMeasure();
   if (t.id==="addOpening") { const first = (e.selections||[])[0]||{}; e.openings.push({room:"",folder:first.folder||"",collection:first.collection||"",product:first.product||"CURTAIN",style:"AP",width:"",height:"",fabricWidth:54,liningWidth:54,hem:12,repeat:0,extra:0,splits:1,lining:"",hardware:"NDL",coverage:"",qtyOverride:""}); persist(); render(); }
   if (t.dataset.del) { e.openings.splice(Number(t.dataset.del),1); persist(); render(); }
   if (t.id==="printQuote") printQuote();
