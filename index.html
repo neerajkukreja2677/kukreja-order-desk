@@ -52,10 +52,12 @@
   </div>
 </header>
 <main>
-  <div class="card" style="display:flex; gap:8px; align-items:end;">
-    <div style="flex:1"><label>Open enquiry</label><select id="enquiryPick"></select></div>
+  <div class="card" style="display:flex; gap:8px; align-items:end; flex-wrap:wrap;">
+    <div style="flex:1; min-width:180px;"><label>Open enquiry</label><select id="enquiryPick"></select></div>
+    <div style="flex:1; min-width:180px;"><label>Search by mobile</label><input id="mobileSearch" inputmode="tel" placeholder="Enter mobile number"></div>
     <button type="button" id="sampleBtn">Load sample 33482</button>
   </div>
+  <div id="mobileHits"></div>
   <div class="tabs" id="tabs"></div>
   <div class="chips" id="chips"></div>
   <section id="panel"><div class="card">Loading enquiry...</div></section>
@@ -73,6 +75,8 @@ const GST = { "LUSTRE-101":"INC","LUSTRE-131":"INC","LUSTRE-148":"INC","LUSTRE-1
 let db = load();
 let id = db.enquiries[0]?.id || null;
 let tab = "customer";
+let mobileQuery = "";
+function digits(s) { return String(s || "").replace(/\D/g, ""); }
 
 function load() {
   try { const s = JSON.parse(localStorage.getItem(KEY) || "null"); if (s && s.enquiries) return s; } catch (err) {}
@@ -183,7 +187,10 @@ function render() {
   const e = current();
   const fab = e ? materials(e).filter(m => m.unit==="Mtrs" && !m.name.includes("LINING")).reduce((s,m)=>s+m.finalQty,0) : 0;
   document.getElementById("chips").innerHTML = e ? `<span>${(e.selections||[]).length} selections</span><span>${e.openings.length} openings</span><span>${rnd(fab)} m fabric</span><span>${e.discount||0}% discount</span>` : "";
-  document.getElementById("enquiryPick").innerHTML = db.enquiries.map(e => `<option value="${e.id}" ${e.id===id?"selected":""}>${e.quoteNo} · ${esc(e.customer||"New")}</option>`).join("") || "<option>No enquiry</option>";
+  document.getElementById("enquiryPick").innerHTML = db.enquiries.map(e => `<option value="${e.id}" ${e.id===id?"selected":""}>${e.quoteNo} · ${esc(e.customer||"New")} · ${esc(e.phone||"no mobile")}</option>`).join("") || "<option>No enquiry</option>";
+  const search = document.getElementById("mobileSearch");
+  if (search && document.activeElement !== search) search.value = mobileQuery;
+  searchMobile();
   document.getElementById("statusLine").textContent = e ? `${e.quoteNo} / REV ${e.revision} · ${e.status}` : "No enquiry open";
   document.getElementById("panel").innerHTML = e ? panels[tab](e) : "<div class='card'>Create an enquiry or load sample 33482.</div>";
 }
@@ -366,6 +373,26 @@ document.getElementById("sampleBtn").onclick = () => {
   db.enquiries.unshift(e); id=e.id; tab="customer"; persist(); render();
 };
 document.getElementById("enquiryPick").onchange = ev => { id = ev.target.value; render(); };
+function searchMobile() {
+  const box = document.getElementById("mobileHits");
+  if (!box) return;
+  const q = mobileQuery.trim();
+  const d = digits(q);
+  if (!d) { box.innerHTML = ""; return; }
+  const found = db.enquiries.filter(e => digits(e.phone).includes(d));
+  if (!found.length) {
+    box.innerHTML = `<div class="card"><p>No enquiry for ${esc(q)}. <button type="button" id="newFromMobile">Start new enquiry</button></p></div>`;
+    document.getElementById("newFromMobile").onclick = () => {
+      const e = blankEnquiry();
+      e.phone = q; e.stock={}; e.received={}; e.taken={};
+      db.enquiries.unshift(e); id=e.id; tab="customer"; persist(); render();
+    };
+    return;
+  }
+  box.innerHTML = `<div class="card">${found.map(e => `<button type="button" data-open="${e.id}" style="margin:0 6px 6px 0">${esc(e.quoteNo)} · ${esc(e.customer||"New")} · ${esc(e.phone||"")}</button>`).join("")}</div>`;
+  box.querySelectorAll("[data-open]").forEach(btn => btn.onclick = () => { id = btn.dataset.open; tab = "customer"; render(); });
+}
+document.getElementById("mobileSearch").oninput = ev => { mobileQuery = ev.target.value; searchMobile(); };
 try {
   if (!db.enquiries.length) document.getElementById("sampleBtn").onclick();
   else render();
